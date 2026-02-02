@@ -786,56 +786,57 @@
         async processWithAI(userMessage) {
             const context = this.getPageContext();
             
-            const systemPrompt = `Ты — ИИ агент на сайте. Выполняй действия!
+            const systemPrompt = `Ты ИИ агент. Отвечай ТОЛЬКО JSON.
 
-ЭЛЕМЕНТЫ:
-${JSON.stringify(context.elements.slice(0, 25), null, 2)}
+ЭЛЕМЕНТЫ НА СТРАНИЦЕ:
+${JSON.stringify(context.elements.slice(0, 20), null, 2)}
 
-ОТВЕЧАЙ ТОЛЬКО JSON (без markdown):
-{"message": "текст", "actions": [{"type": "тип", "selector": "селектор", "value": "значение", "tooltip": "подсказка"}]}
+ФОРМАТ ОТВЕТА (ТОЛЬКО JSON, без markdown, без \`\`\`):
+{"message": "текст для пользователя", "actions": [{"type": "click", "selector": "CSS селектор", "tooltip": "подсказка"}]}
 
-ТИПЫ: click, input, select, check, clear
+ТИПЫ ДЕЙСТВИЙ: click, input, select, check
 
 ПРИМЕРЫ:
-- Клик: {"message": "Нажимаю! 👆", "actions": [{"type": "click", "selector": "#btn", "tooltip": "Кликаю"}]}
-- Ввод: {"message": "Ввожу! ✍️", "actions": [{"type": "input", "selector": "#name", "value": "Иван", "tooltip": "Печатаю"}]}
-- Привет: {"message": "Привет! 👋 Чем помочь?", "actions": []}
+Запрос: "нажми кнопку"
+Ответ: {"message": "Нажимаю! 👆", "actions": [{"type": "click", "selector": "#btn", "tooltip": "Кликаю"}]}
 
-ПРАВИЛА: только JSON, точные селекторы, actions=[] для разговора`;
+Запрос: "заполни имя Иван"
+Ответ: {"message": "Заполняю ✍️", "actions": [{"type": "input", "selector": "#name", "value": "Иван", "tooltip": "Ввожу"}]}
 
-            // Используем правильный Pollinations API endpoint
-            const response = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.config.apiKey
-                },
-                body: JSON.stringify({
-                    model: 'gemini',
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userMessage }
-                    ],
-                    stream: false
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const data = await response.json();
-            const fullResponse = data.choices?.[0]?.message?.content || '';
+Запрос: "привет"
+Ответ: {"message": "Привет! 👋 Чем помочь?", "actions": []}
 
-            this.removeThinking();
+ВАЖНО: actions = [] если это просто разговор без действий.`;
 
             try {
+                // Используем простой text endpoint
+                const prompt = encodeURIComponent(systemPrompt + "\n\nЗапрос пользователя: " + userMessage);
+                
+                const response = await fetch(`https://text.pollinations.ai/${prompt}?model=openai&json=true`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'text/plain' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const fullResponse = await response.text();
+
+                this.removeThinking();
+
                 // Clean response
                 let cleanResponse = fullResponse.trim();
                 if (cleanResponse.startsWith('```json')) cleanResponse = cleanResponse.slice(7);
                 if (cleanResponse.startsWith('```')) cleanResponse = cleanResponse.slice(3);
                 if (cleanResponse.endsWith('```')) cleanResponse = cleanResponse.slice(0, -3);
                 cleanResponse = cleanResponse.trim();
+                
+                // Find JSON in response
+                const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    cleanResponse = jsonMatch[0];
+                }
 
                 const aiResponse = JSON.parse(cleanResponse);
                 this.addMessage(aiResponse.message, 'bot');
@@ -847,8 +848,9 @@ ${JSON.stringify(context.elements.slice(0, 25), null, 2)}
                     }, 800);
                 }
             } catch (e) {
-                console.error('Parse error:', e, fullResponse);
-                this.addMessage(fullResponse || 'Не удалось распознать ответ.', 'bot');
+                console.error('API/Parse error:', e);
+                this.removeThinking();
+                this.addMessage('Что-то пошло не так. Попробуй ещё раз!', 'bot');
             }
         }
 
