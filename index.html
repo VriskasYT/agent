@@ -3347,8 +3347,8 @@ ${JSON.stringify(filteredElements.slice(0, 25), null, 2)}
                         'Authorization': 'Bearer ' + atob(this.config._k)
                     },
                     body: JSON.stringify({
-                        model: 'openai',
-                        messages: [
+                            model: 'gemini',
+                            messages: [
                             { role: 'system', content: systemPrompt },
                             { role: 'user', content: userMessage }
                         ],
