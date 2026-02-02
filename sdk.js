@@ -811,7 +811,7 @@ ${JSON.stringify(context.elements.slice(0, 25), null, 2)}
                     'Authorization': 'Bearer ' + this.config.apiKey
                 },
                 body: JSON.stringify({
-                    model: 'openai',
+                    model: 'gemini',
                     messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: userMessage }
