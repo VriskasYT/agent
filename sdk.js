@@ -786,44 +786,46 @@
         async processWithAI(userMessage) {
             const context = this.getPageContext();
             
-            const systemPrompt = `Ты — ИИ агент. Ты ВЫПОЛНЯЕШЬ действия на странице!
+            const systemPrompt = `Ты — ИИ агент на сайте. Выполняй действия!
 
-ЭЛЕМЕНТЫ НА СТРАНИЦЕ:
-${JSON.stringify(context.elements.slice(0, 30), null, 2)}
+ЭЛЕМЕНТЫ:
+${JSON.stringify(context.elements.slice(0, 25), null, 2)}
 
-ВАЖНО! ОТВЕЧАЙ ТОЛЬКО JSON БЕЗ MARKDOWN:
-{"message": "текст для пользователя", "actions": [...]}
+ОТВЕЧАЙ ТОЛЬКО JSON (без markdown):
+{"message": "текст", "actions": [{"type": "тип", "selector": "селектор", "value": "значение", "tooltip": "подсказка"}]}
 
-ТИПЫ ДЕЙСТВИЙ:
-- click: нажать кнопку/ссылку
-- input: ввести текст (value = текст)
-- select: выбрать опцию (value = текст)
-- check: отметить checkbox/radio
-- clear: очистить поле
+ТИПЫ: click, input, select, check, clear
 
-ПРАВИЛА:
-1. ВСЕГДА отвечай ТОЛЬКО JSON
-2. Используй ТОЧНЫЕ селекторы из списка элементов
-3. Для разговора — actions пустой []
-4. message — краткий и дружелюбный
-5. НЕ пиши ничего кроме JSON!`;
+ПРИМЕРЫ:
+- Клик: {"message": "Нажимаю! 👆", "actions": [{"type": "click", "selector": "#btn", "tooltip": "Кликаю"}]}
+- Ввод: {"message": "Ввожу! ✍️", "actions": [{"type": "input", "selector": "#name", "value": "Иван", "tooltip": "Печатаю"}]}
+- Привет: {"message": "Привет! 👋 Чем помочь?", "actions": []}
 
-            // Используем Pollinations API
-            const response = await fetch('https://text.pollinations.ai/', {
+ПРАВИЛА: только JSON, точные селекторы, actions=[] для разговора`;
+
+            // Используем правильный Pollinations API endpoint
+            const response = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.config.apiKey
                 },
                 body: JSON.stringify({
+                    model: 'openai',
                     messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: userMessage }
                     ],
-                    model: 'openai',
-                    jsonMode: true
+                    stream: false
                 })
             });
-            const fullResponse = await response.text();
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const fullResponse = data.choices?.[0]?.message?.content || '';
 
             this.removeThinking();
 
