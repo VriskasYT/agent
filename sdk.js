@@ -450,7 +450,7 @@
                 // Зашифрованный API ключ (base64) - используется по умолчанию
                 _defaultKey: 'c2tfTUlySm9Wbmdnc01lR3RWaGZBYm1ZRmxSdk9BSENsbHFj',
                 apiKey: '',
-                apiUrl: 'https://text.pollinations.ai/',
+                apiUrl: 'https://text.pollinations.ai',
                 model: 'claude',
                 position: 'bottom-right',
                 theme: 'dark',
@@ -808,9 +808,21 @@ ${JSON.stringify(context.elements.slice(0, 30), null, 2)}
 4. message — краткий и дружелюбный
 5. НЕ пиши ничего кроме JSON!`;
 
-            // Используем бесплатный API endpoint
-            const prompt = encodeURIComponent(systemPrompt + '\n\nЗапрос пользователя: ' + userMessage);
-            const response = await fetch(`https://text.pollinations.ai/${prompt}?model=openai&json=true`);
+            // Используем Pollinations API
+            const response = await fetch('https://text.pollinations.ai/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userMessage }
+                    ],
+                    model: 'openai',
+                    jsonMode: true
+                })
+            });
             const fullResponse = await response.text();
 
             this.removeThinking();
@@ -1261,6 +1273,11 @@ ${JSON.stringify(context.elements.slice(0, 30), null, 2)}
         }
 
         async moveCursorTo(element) {
+            // Сначала скроллим к элементу
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            await this.sleep(400);
+            
+            // Получаем координаты ПОСЛЕ скролла
             const rect = element.getBoundingClientRect();
             const x = rect.left + rect.width / 2;
             const y = rect.top + rect.height / 2;
