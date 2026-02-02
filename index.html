@@ -3322,64 +3322,48 @@
                     );
                 }
                 
-                const systemPrompt = `Ты — ИИ агент. Ты ВЫПОЛНЯЕШЬ действия на странице!
+                const systemPrompt = `Ты — ИИ агент на сайте. Выполняй действия!
 
-ЭЛЕМЕНТЫ НА СТРАНИЦЕ:
-${JSON.stringify(filteredElements.slice(0, 30), null, 2)}
+ЭЛЕМЕНТЫ:
+${JSON.stringify(filteredElements.slice(0, 25), null, 2)}
 
-ВАЖНО! ОТВЕЧАЙ ТОЛЬКО JSON БЕЗ MARKDOWN:
-{"message": "текст для пользователя", "actions": [...]}
+ОТВЕЧАЙ ТОЛЬКО JSON (без markdown):
+{"message": "текст", "actions": [{"type": "тип", "selector": "селектор", "value": "значение", "tooltip": "подсказка"}]}
 
-ТИПЫ ДЕЙСТВИЙ:
-- click: нажать кнопку/ссылку
-- input: ввести текст (value = текст)
-- select: выбрать опцию (value = текст)
-- check: отметить checkbox/radio
-- clear: очистить поле
+ТИПЫ: click, input, select, check, clear
 
-ПРИМЕРЫ ОТВЕТОВ:
+ПРИМЕРЫ:
+- Добавить наушники: {"message": "Добавляю! 🎧", "actions": [{"type": "click", "selector": ".product-card:nth-child(1) .add-to-cart", "tooltip": "Кликаю"}]}
+- Заполнить имя Иван: {"message": "Заполняю! ✍️", "actions": [{"type": "input", "selector": "#reg-name", "value": "Иван", "tooltip": "Ввожу"}]}
+- Привет: {"message": "Привет! 👋 Чем помочь?", "actions": []}
 
-Если просят добавить в корзину наушники:
-{"message": "Добавляю наушники в корзину! 🎧", "actions": [{"type": "click", "selector": ".product-card:nth-child(1) .add-to-cart", "tooltip": "Добавляю в корзину"}]}
+ПРАВИЛА: только JSON, точные селекторы, actions=[] для разговора`;
 
-Если просят заполнить форму (имя Иван, email test@mail.ru):
-{"message": "Заполняю форму! ✍️", "actions": [{"type": "input", "selector": "#reg-name", "value": "Иван", "tooltip": "Ввожу имя"}, {"type": "input", "selector": "#reg-email", "value": "test@mail.ru", "tooltip": "Ввожу email"}]}
-
-Если просят отметить рассылку:
-{"message": "Подписываю на рассылку! 📧", "actions": [{"type": "check", "selector": "#reg-newsletter", "tooltip": "Отмечаю галочку"}]}
-
-Если просто здороваются или спрашивают:
-{"message": "Привет! 👋 Я ИИ агент, могу нажимать кнопки, заполнять формы и помогать с сайтом. Что сделать?", "actions": []}
-
-ПРАВИЛА:
-1. ВСЕГДА отвечай ТОЛЬКО JSON
-2. Используй ТОЧНЫЕ селекторы из списка элементов
-3. Для разговора — actions пустой []
-4. message — краткий и дружелюбный
-5. НЕ пиши ничего кроме JSON!`;
-
-                // Используем Pollinations API
-                const response = await fetch('https://text.pollinations.ai/', {
+                // Используем правильный Pollinations API endpoint
+                const response = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + atob(this.config._k)
                     },
                     body: JSON.stringify({
+                        model: 'openai',
                         messages: [
                             { role: 'system', content: systemPrompt },
                             { role: 'user', content: userMessage }
                         ],
-                        model: 'openai-large',
-                        stream: false,
-                        jsonMode: true
+                        stream: false
                     })
                 });
                 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, errorText);
                     throw new Error(`HTTP ${response.status}`);
                 }
                 
-                const fullResponse = await response.text();
+                const data = await response.json();
+                const fullResponse = data.choices?.[0]?.message?.content || '';
 
                 this.removeThinking();
 
